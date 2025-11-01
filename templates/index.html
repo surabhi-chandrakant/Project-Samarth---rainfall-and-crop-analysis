@@ -1,0 +1,412 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Project Samarth 🌾</title>
+
+  <!-- React + Babel -->
+  <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+  <!-- Chart.js for charts -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+  <!-- Tailwind -->
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <style>
+    @keyframes pulse {
+      0%, 100% { opacity: 0.5; transform: scale(1); }
+      50% { opacity: 1; transform: scale(1.05); }
+    }
+    @keyframes bounce {
+      0%, 80%, 100% { transform: scale(0); }
+      40% { transform: scale(1.0); }
+    }
+    .chart-container {
+      position: relative;
+      height: 300px;
+      width: 100%;
+    }
+  </style>
+</head>
+
+<body class="bg-gray-950 text-white overflow-x-hidden">
+  <div id="root"></div>
+
+  {% raw %}
+  <script type="text/babel">
+    const { useState, useEffect, useRef } = React;
+
+    const API_URL = "/api";  // Changed from localhost to relative path
+
+    const SamarthApp = () => {
+      const [messages, setMessages] = useState([]);
+      const [input, setInput] = useState("");
+      const [loading, setLoading] = useState(false);
+      const [stats, setStats] = useState(null);
+      const [sampleQuestions, setSampleQuestions] = useState([]);
+      const chatEndRef = useRef(null);
+      const chartRefs = useRef({});
+
+      useEffect(() => {
+        fetchStats();
+        fetchSampleQuestions();
+        setMessages([
+          {
+            type: "system",
+            content: "🌾 Welcome to Project Samarth! I'm your AI-powered agricultural assistant. Ask about rainfall, production, or state comparisons.",
+          },
+        ]);
+      }, []);
+
+      useEffect(() => {
+        chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
+      }, [messages]);
+
+      useEffect(() => {
+        // Render charts after messages update
+        Object.values(chartRefs.current).forEach(({ ref, chartData }) => {
+          if (ref && chartData) {
+            renderChart(ref, chartData);
+          }
+        });
+      }, [messages]);
+
+      const fetchStats = async () => {
+        try {
+          const res = await fetch(`${API_URL}/stats`);
+          const data = await res.json();
+          setStats(data);
+        } catch (err) {
+          console.error("Stats fetch error:", err);
+        }
+      };
+
+      const fetchSampleQuestions = async () => {
+        try {
+          const res = await fetch(`${API_URL}/sample-questions`);
+          const data = await res.json();
+          setSampleQuestions(data.questions || []);
+        } catch (err) {
+          console.error("Sample fetch error:", err);
+        }
+      };
+
+      const handleSend = async () => {
+        if (!input.trim()) return;
+        const userMsg = { type: "user", content: input };
+        setMessages((prev) => [...prev, userMsg]);
+        setInput("");
+        setLoading(true);
+        try {
+          const res = await fetch(`${API_URL}/query`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ question: input }),
+          });
+          const data = await res.json();
+          if (data.success) {
+            setMessages((prev) => [
+              ...prev,
+              {
+                type: "assistant",
+                content: data.answer,
+                chartData: data.chart_data,
+                sources: data.sources,
+              },
+            ]);
+          } else {
+            throw new Error(data.error || "Query failed");
+          }
+        } catch (err) {
+          setMessages((prev) => [
+            ...prev,
+            {
+              type: "error",
+              content: `⚠️ ${err.message}. Please ensure the backend server is running.`,
+            },
+          ]);
+        } finally {
+          setLoading(false);
+        }
+      };
+
+      const renderChart = (canvas, chartData) => {
+        if (!chartData || !chartData.data) return;
+
+        const ctx = canvas.getContext('2d');
+        
+        // Destroy existing chart if it exists
+        if (canvas.chart) {
+          canvas.chart.destroy();
+        }
+
+        if (chartData.type === "line") {
+          const labels = chartData.data.map(d => d.year);
+          const productionData = chartData.data.map(d => d.production);
+          const rainfallData = chartData.data.map(d => d.rainfall);
+
+          canvas.chart = new Chart(ctx, {
+            type: 'line',
+            data: {
+              labels: labels,
+              datasets: [
+                {
+                  label: 'Production',
+                  data: productionData,
+                  borderColor: '#10B981',
+                  backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                  borderWidth: 3,
+                  fill: true,
+                  tension: 0.4
+                },
+                ...(rainfallData[0] !== undefined ? [{
+                  label: 'Rainfall',
+                  data: rainfallData,
+                  borderColor: '#3B82F6',
+                  backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                  borderWidth: 2,
+                  fill: true,
+                  tension: 0.4,
+                  yAxisID: 'y1'
+                }] : [])
+              ]
+            },
+            options: {
+              responsive: true,
+              maintainAspectRatio: false,
+              plugins: {
+                legend: {
+                  labels: {
+                    color: '#9CA3AF'
+                  }
+                }
+              },
+              scales: {
+                x: {
+                  grid: {
+                    color: 'rgba(55, 65, 81, 0.5)'
+                  },
+                  ticks: {
+                    color: '#9CA3AF'
+                  }
+                },
+                y: {
+                  grid: {
+                    color: 'rgba(55, 65, 81, 0.5)'
+                  },
+                  ticks: {
+                    color: '#9CA3AF'
+                  },
+                  title: {
+                    display: true,
+                    text: 'Production',
+                    color: '#9CA3AF'
+                  }
+                },
+                ...(rainfallData[0] !== undefined ? {
+                  y1: {
+                    position: 'right',
+                    grid: {
+                      drawOnChartArea: false,
+                    },
+                    ticks: {
+                      color: '#9CA3AF'
+                    },
+                    title: {
+                      display: true,
+                      text: 'Rainfall (mm)',
+                      color: '#9CA3AF'
+                    }
+                  }
+                } : {})
+              }
+            }
+          });
+        } else if (chartData.type === "bar") {
+          const labels = chartData.data.map(d => d.name);
+          const datasets = [];
+          
+          // Get all keys except 'name'
+          const keys = Object.keys(chartData.data[0]).filter(key => key !== 'name');
+          const colors = ['#10B981', '#3B82F6', '#F59E0B', '#EF4444', '#8B5CF6'];
+          
+          keys.forEach((key, index) => {
+            datasets.push({
+              label: key,
+              data: chartData.data.map(d => d[key]),
+              backgroundColor: colors[index % colors.length],
+              borderColor: colors[index % colors.length],
+              borderWidth: 1
+            });
+          });
+
+          canvas.chart = new Chart(ctx, {
+            type: 'bar',
+            data: {
+              labels: labels,
+              datasets: datasets
+            },
+            options: {
+              responsive: true,
+              maintainAspectRatio: false,
+              plugins: {
+                legend: {
+                  labels: {
+                    color: '#9CA3AF'
+                  }
+                }
+              },
+              scales: {
+                x: {
+                  grid: {
+                    color: 'rgba(55, 65, 81, 0.5)'
+                  },
+                  ticks: {
+                    color: '#9CA3AF'
+                  }
+                },
+                y: {
+                  grid: {
+                    color: 'rgba(55, 65, 81, 0.5)'
+                  },
+                  ticks: {
+                    color: '#9CA3AF'
+                  }
+                }
+              }
+            }
+          });
+        }
+      };
+
+      const ChartComponent = ({ chartData, messageIndex }) => {
+        const canvasRef = useRef(null);
+
+        useEffect(() => {
+          if (canvasRef.current && chartData) {
+            chartRefs.current[messageIndex] = { ref: canvasRef.current, chartData };
+            renderChart(canvasRef.current, chartData);
+          }
+        }, [chartData, messageIndex]);
+
+        return (
+          <div className="chart-container mt-4">
+            <canvas ref={canvasRef} />
+          </div>
+        );
+      };
+
+      return (
+        <div className="relative min-h-screen flex flex-col bg-gradient-to-br from-slate-900 via-indigo-900 to-slate-950">
+          <div className="absolute inset-0 overflow-hidden pointer-events-none">
+            <div className="absolute top-0 right-0 w-96 h-96 bg-green-400/10 blur-3xl animate-pulse"></div>
+            <div className="absolute bottom-0 left-0 w-96 h-96 bg-blue-500/10 blur-3xl animate-pulse delay-1000"></div>
+          </div>
+
+          <header className="z-10 bg-black/30 backdrop-blur-lg border-b border-white/10 shadow-lg">
+            <div className="max-w-7xl mx-auto p-6 flex justify-between items-center">
+              <h1 className="text-3xl font-bold bg-gradient-to-r from-green-400 via-blue-400 to-purple-400 bg-clip-text text-transparent">
+                🌾 Project Samarth
+              </h1>
+              {stats && (
+                <div className="flex gap-6 text-sm">
+                  <div className="text-green-400">{stats.agriculture?.states || 0} States</div>
+                  <div className="text-blue-400">{stats.agriculture?.crops || 0} Crops</div>
+                  <div className="text-purple-400">{stats.agriculture?.records || 0} Records</div>
+                </div>
+              )}
+            </div>
+          </header>
+
+          <main className="z-10 max-w-7xl mx-auto flex flex-col lg:flex-row gap-8 p-6">
+            <section className="flex-1 bg-white/5 border border-white/10 rounded-2xl backdrop-blur-lg shadow-xl flex flex-col h-[80vh]">
+              <div className="p-4 border-b border-white/10">
+                <h2 className="text-lg font-semibold text-green-300">AI Chat Interface</h2>
+              </div>
+              <div className="flex-1 overflow-y-auto p-4 space-y-4">
+                {messages.map((msg, i) => (
+                  <div key={i} className={`flex ${msg.type === "user" ? "justify-end" : "justify-start"}`}>
+                    <div
+                      className={`max-w-[80%] rounded-xl p-4 ${
+                        msg.type === "user"
+                          ? "bg-gradient-to-r from-green-500 to-blue-500"
+                          : msg.type === "error"
+                          ? "bg-red-900/40 border border-red-500/20"
+                          : "bg-white/5 border border-white/10"
+                      }`}
+                    >
+                      <div className="text-sm whitespace-pre-wrap">{msg.content}</div>
+                      {msg.chartData && <ChartComponent chartData={msg.chartData} messageIndex={i} />}
+                      {msg.sources && (
+                        <div className="mt-2 text-xs text-blue-300">
+                          <p>📊 Sources:</p>
+                          {msg.sources.map((s, idx) => (
+                            <p key={idx}>• {s}</p>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ))}
+                {loading && (
+                  <div className="text-gray-400 text-sm flex items-center gap-2 animate-pulse">
+                    <div className="flex space-x-1">
+                      <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></div>
+                      <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{animationDelay: '0.1s'}}></div>
+                      <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{animationDelay: '0.2s'}}></div>
+                    </div>
+                    Analyzing with AI...
+                  </div>
+                )}
+                <div ref={chatEndRef}></div>
+              </div>
+
+              <div className="p-4 border-t border-white/10 bg-black/20 flex gap-2">
+                <input
+                  type="text"
+                  className="flex-1 bg-white/10 border border-white/20 rounded-lg px-4 py-3 outline-none text-sm text-white"
+                  placeholder="Ask about rainfall, yield, or crop comparison..."
+                  value={input}
+                  onChange={(e) => setInput(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && handleSend()}
+                />
+                <button
+                  onClick={handleSend}
+                  disabled={!input.trim() || loading}
+                  className="bg-gradient-to-r from-green-500 to-blue-500 px-6 py-3 rounded-lg font-semibold disabled:opacity-50"
+                >
+                  Send
+                </button>
+              </div>
+            </section>
+
+            <aside className="w-full lg:w-1/3 flex flex-col gap-6">
+              <div className="bg-white/5 border border-white/10 rounded-2xl backdrop-blur-lg p-4">
+                <h3 className="text-green-400 font-semibold mb-3">💡 Sample Questions</h3>
+                <div className="flex flex-col gap-2">
+                  {sampleQuestions.slice(0, 6).map((q, i) => (
+                    <button
+                      key={i}
+                      onClick={() => setInput(q)}
+                      className="bg-white/5 hover:bg-white/10 border border-white/10 rounded-md text-left text-sm p-2 transition-all"
+                    >
+                      {q}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </aside>
+          </main>
+        </div>
+      );
+    };
+
+    ReactDOM.createRoot(document.getElementById("root")).render(<SamarthApp />);
+  </script>
+  {% endraw %}
+</body>
+</html>
