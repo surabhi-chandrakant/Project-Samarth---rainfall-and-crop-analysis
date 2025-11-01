@@ -2,6 +2,8 @@
 
 A comprehensive analysis of the relationship between crop production and rainfall patterns in India using open data from data.gov.in.
 
+Live Web app: https://project-samarth-rainfall-and-crop.onrender.com
+
 ## 📊 Project Overview
 
 This project analyzes the correlation between rainfall patterns and crop production across different districts in India. The analysis helps understand how meteorological factors impact agricultural productivity.
