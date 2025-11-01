@@ -77,7 +77,7 @@ This project analyzes the correlation between rainfall patterns and crop product
 
 5. **Running the Project**
    ```bash
-   python app3.py
+   python app.py
    ```
 
 6. **View results**
@@ -87,12 +87,14 @@ This project analyzes the correlation between rainfall patterns and crop product
 ## 📁 Project Structure
 ```
 samrath-projects/
-├── app3.py                 # Main application script
-├── data.csv                # Processed merged dataset
-├── requirements.txt        # Python dependencies
-├── .env                    # Environment configuration
-├── index.html              # Dashboard/Visualization
-└── README.md               # Project documentation
+├── app.py
+├── data.csv
+├── requirements.txt
+├── runtime.txt
+├── .gitignore
+├── README.md
+└── templates/
+    └── index.html
 ```
 
 ## 📊 Analysis Features
